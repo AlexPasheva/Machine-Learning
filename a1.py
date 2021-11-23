@@ -28,32 +28,26 @@ def extractDictionary(corpus):
             if w not in dictionary: dictionary.add(w)
     return dictionary
 
-def distanceHelper(str1, str2, m, n):
-  
-    # If first string is empty, the only option is to
-    # insert all characters of second string into first
-    if m == 0:
-        return n
-  
-    # If second string is empty, the only option is to
-    # remove all characters of first string
-    if n == 0:
-        return m
-  
-    # If last characters of two strings are same, nothing
-    # much to do. Ignore last characters and get count for
-    # remaining strings.
-    if str1[m-1] == str2[n-1]:
-        return distanceHelper(str1, str2, m-1, n-1)
-  
-    # If last characters are not same, consider all three
-    # operations on last character of first string, recursively
-    # compute minimum cost for all three operations and take
-    # minimum of three values.
-    return 1 + min(distanceHelper(str1, str2, m, n-1),    # Insert
-                   distanceHelper(str1, str2, m-1, n),    # Remove
-                   distanceHelper(str1, str2, m-1, n-1)    # Replace
-                   )
+def _levenshtein_distance_matrix(s1, s2):
+    n1 = len(s1)
+    n2 = len(s2)
+    d = np.zeros((n1 + 1, n2 + 1), dtype=int)
+    for i in range(n1 + 1):
+        d[i, 0] = i
+    for j in range(n2 + 1):
+        d[0, j] = j
+    for i in range(n1):
+        for j in range(n2):
+            if s1[i] == s2[j]:
+                cost = 0
+            else:
+                cost = 1
+            d[i+1, j+1] = min(d[i, j+1] + 1, # insert
+                              d[i+1, j] + 1, # delete
+                              d[i, j] + cost) # replace
+            if i > 0 and j > 0 and s1[i] == s2[j-1] and s1[i-1] == s2[j]:
+                d[i+1, j+1] = min(d[i+1, j+1], d[i-1, j-1] + cost) # transpose
+    return d
     
 def editDistance(s1, s2):
     #### функцията намира разстоянието на Левенщайн-Дамерау между два низа
@@ -62,46 +56,13 @@ def editDistance(s1, s2):
 
     #############################################################################
     #### Начало на Вашия код. На мястото на pass се очакват 10-25 реда
-
-    print(distanceHelper(s1, s2, len(s1), len(s2)))
+    
+    resultMatrix = _levenshtein_distance_matrix(s1, s2)
+    i,j=resultMatrix.shape
+    return resultMatrix[i-1][j-1]
 
     #### Край на Вашия код
     #############################################################################
-    
-
-
-def editOperationHelper(s1, s2, m, n, dictionary):
-    m = len(s1)
-    n = len(s2)
-    #dictionary(zip('', s2))
-    # If first string is empty, the only option is to
-    # insert all characters of second string into first
-    if m == 0:
-        return {'': s2}
-  
-    # If second string is empty, the only option is to
-    # remove all characters of first string
-    if n == 0:
-        return {s1: ''}
-  
-    # If last characters of two strings are same, nothing
-    # much to do. Ignore last characters and get count for
-    # remaining strings.
-    # adsds adprd
-    # {a: a}
-    # {ad: ad} 
-    if s1[m-1] == s2[n-1]:
-        return editDistance(s1, s2, m-1, n-1, dictionary.indexOf())
-  
-    # If last characters are not same, consider all three
-    # operations on last character of first string, recursively
-    # compute minimum cost for all three operations and take
-    # minimum of three values.
-    return 1 + min(editDistance(s1, s2, m, n-1),    # Insert
-                   editDistance(s1, s2, m-1, n),    # Remove
-                   editDistance(s1, s2, m-1, n-1)    # Replace
-                   )
-
  
 def editOperations(s1, s2):
     #### функцията намира елементарни редакции, неободими за получаването на един низ от друг
@@ -117,12 +78,49 @@ def editOperations(s1, s2):
     #### Можете да преизползвате и модифицирате кода на функцията editDistance
     #############################################################################
     #### Начало на Вашия код.
-    print(editOperationHelper(s1, s2, len(s1), len(s2), ""))
+    
+    dist_matrix = _levenshtein_distance_matrix(s1, s2)
+    i, j = dist_matrix.shape
+    i -= 1
+    j -= 1
+  
+    ops = list()
+    
+    while i != 0 and j != 0:
+        if i > 1 and j > 1 and s1[i-1] == s2[j-2] and s1[i-2] == s2[j-1]:
+            if dist_matrix[i-2, j-2] < dist_matrix[i, j]:
+                ops.insert(0, ('transpose', s2[i-1] + s2[i-2], s1[i - 1] + s1[i-2])) # transpose
+                i -= 2
+                j -= 2
+                continue
+        
+        index = np.argmin([dist_matrix[i-1, j-1], dist_matrix[i, j-1], dist_matrix[i-1, j]])
+        
+        if index == 0:
+            if dist_matrix[i, j] > dist_matrix[i-1, j-1]:
+                ops.insert(0, ('replace', s2[i - 1], s1[j - 1])) # replace
+            else:
+                ops.insert(0, ('identity', s1[i-1], s2[j - 1])) # identity
+            i -= 1
+            j -= 1
+            
+        elif index == 1:
+            ops.insert(0, ('insert', "", s2[j - 1])) # insert
+            j -= 1
+        elif index == 2:
+            ops.insert(0, ('delete', s1[i - 1], "")) # delete
+            i -= 1
+    return ops
+
     #### Край на Вашия код
     #############################################################################
     
 if __name__== "__main__" :
-    editOperations("", "дъмбълдо")
+    print(editDistance("иван", "иванн"))
+    print(editOperations("мария", "амрия"))
+    print(editOperations("иван", "иванн"))
+    print(editOperations("обича", "убичъ"))
+    print(editOperations("мн", "много"))
 
 def computeOperationProbs(corrected_corpus,uncorrected_corpus,smoothing = 0.2):
     #### Функцията computeOperationProbs изчислява теглата на дадени елементарни операции (редакции)
