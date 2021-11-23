@@ -68,40 +68,30 @@ def editDistance(s1, s2):
     #### Край на Вашия код
     #############################################################################
     
-if __name__== "__main__" :
-    editDistance("дъмбълдор", "дъмбълдо")
-    
-def editOperations(s1, s2):
-    #### функцията намира елементарни редакции, неободими за получаването на един низ от друг
-    #### вход: низовете s1 и s2
-    #### изход: списък с елементарните редакции ( идентитет, вмъкване, изтриване, субституция и транспоциция на символи) необходими, за да се получи втория низ от първия
-    
-    #### Например: editOperations('котка', 'октава') би следвало да връща списъка:
-    ####    [('ко', 'ок'), ('т','т'), ('', 'а'), ('к', 'в'), ('а','а')]
-    ####        |ко   |т |   |к  |а |
-    ####        |ок   |т |а  |в  |а |
-    ####        |Trans|Id|Ins|Sub|Id|
-    ####
-    #### Можете да преизползвате и модифицирате кода на функцията editDistance
-    #############################################################################
-    #### Начало на Вашия код.
+
+
+def editOperationHelper(s1, s2, m, n, dictionary):
     m = len(s1)
     n = len(s2)
+    #dictionary(zip('', s2))
     # If first string is empty, the only option is to
     # insert all characters of second string into first
     if m == 0:
-        return n
+        return {'': s2}
   
     # If second string is empty, the only option is to
     # remove all characters of first string
     if n == 0:
-        return m
+        return {s1: ''}
   
     # If last characters of two strings are same, nothing
     # much to do. Ignore last characters and get count for
     # remaining strings.
+    # adsds adprd
+    # {a: a}
+    # {ad: ad} 
     if s1[m-1] == s2[n-1]:
-        return editDistance(s1, s2, m-1, n-1)
+        return editDistance(s1, s2, m-1, n-1, dictionary.indexOf())
   
     # If last characters are not same, consider all three
     # operations on last character of first string, recursively
@@ -112,8 +102,27 @@ def editOperations(s1, s2):
                    editDistance(s1, s2, m-1, n-1)    # Replace
                    )
 
+ 
+def editOperations(s1, s2):
+    #### функцията намира елементарни редакции, неободими за получаването на един низ от друг
+    #### вход: низовете s1 и s2
+    #### изход: списък с елементарните редакции ( идентитет, вмъкване, изтриване, субституция и транспоzиция на символи) необходими, за да се получи втория низ от първия
+    
+    #### Например: editOperations('котка', 'октава') би следвало да връща списъка:
+    ####    [('ко', 'ок'), ('т','т'), ('', 'а'), ('к', 'в'), ('а','а')]
+    ####        |ко   |т |   |к  |а |
+    ####        |ок   |т |а  |в  |а |
+    ####        |Trans|Id|Ins|Sub|Id|
+    ####
+    #### Можете да преизползвате и модифицирате кода на функцията editDistance
+    #############################################################################
+    #### Начало на Вашия код.
+    print(editOperationHelper(s1, s2, len(s1), len(s2), ""))
     #### Край на Вашия код
     #############################################################################
+    
+if __name__== "__main__" :
+    editOperations("", "дъмбълдо")
 
 def computeOperationProbs(corrected_corpus,uncorrected_corpus,smoothing = 0.2):
     #### Функцията computeOperationProbs изчислява теглата на дадени елементарни операции (редакции)
