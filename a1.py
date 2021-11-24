@@ -15,12 +15,39 @@
 ########################################
 import numpy as np
 import random
+import nltk
+#nltk.download('punkt')
+#nltk.download('stopwords')
+#nltk.download('wordnet')
+
+corpus_typos = open('corpus_typos.txt').read()
+corpus_original = open('corpus_original.txt').read()
 
 alphabet = ['а', 'б', 'в', 'г', 'д', 'е', 'ж', 'з', 'и', 'й', 'к', 'л', 'м', 'н', 'о', 'п', 'р', 'с', 'т', 'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 'ъ', 'ь', 'ю', 'я']
 
+from nltk.tokenize import sent_tokenize
+from nltk import word_tokenize
+from nltk.corpus import stopwords
+from nltk import WordNetLemmatizer
+def clean_text(text):
+    """
+    This function takes as input a text on which several 
+    NLTK algorithms will be applied in order to preprocess it
+    """
+    tokens = word_tokenize(text)
+    # Remove the punctuations
+    tokens = [word for word in tokens if word.isalpha()]
+    # Lower the tokens
+    tokens = [word.lower() for word in tokens]
+    # Remove stopword
+    tokens = [word for word in tokens if not word in stopwords.words("english")]
+    # Lemmatize
+    lemma = WordNetLemmatizer()
+    tokens = [lemma.lemmatize(word, pos = "v") for word in tokens]
+    tokens = [lemma.lemmatize(word, pos = "n") for word in tokens]
+    return tokens
 
-
-
+# neshto si se obyrkal
 def extractDictionary(corpus):
     dictionary = set()
     for doc in corpus:
@@ -28,7 +55,8 @@ def extractDictionary(corpus):
             if w not in dictionary: dictionary.add(w)
     return dictionary
 
-def _levenshtein_distance_matrix(s1, s2):
+
+def levenshteinDistanceMatrix(s1, s2):
     n1 = len(s1)
     n2 = len(s2)
     d = np.zeros((n1 + 1, n2 + 1), dtype=int)
@@ -57,7 +85,7 @@ def editDistance(s1, s2):
     #############################################################################
     #### Начало на Вашия код. На мястото на pass се очакват 10-25 реда
     
-    resultMatrix = _levenshtein_distance_matrix(s1, s2)
+    resultMatrix = levenshteinDistanceMatrix(s1, s2)
     i,j=resultMatrix.shape
     return resultMatrix[i-1][j-1]
 
@@ -79,8 +107,8 @@ def editOperations(s1, s2):
     #############################################################################
     #### Начало на Вашия код.
     
-    dist_matrix = _levenshtein_distance_matrix(s1, s2)
-    i, j = dist_matrix.shape
+    distMatrix = levenshteinDistanceMatrix(s1, s2)
+    i, j = distMatrix.shape
     i -= 1
     j -= 1
   
@@ -88,41 +116,35 @@ def editOperations(s1, s2):
     
     while i != 0 and j != 0:
         if i > 1 and j > 1 and s1[i-1] == s2[j-2] and s1[i-2] == s2[j-1]:
-            if dist_matrix[i-2, j-2] < dist_matrix[i, j]:
-                ops.insert(0, ('transpose', s2[i-1] + s2[i-2], s1[i - 1] + s1[i-2])) # transpose
+            if distMatrix[i-2, j-2] < distMatrix[i, j]:
+                ops.insert(0, (s2[i-1] + s2[i-2], s1[i - 1] + s1[i-2])) # transpose
                 i -= 2
                 j -= 2
                 continue
         
-        index = np.argmin([dist_matrix[i-1, j-1], dist_matrix[i, j-1], dist_matrix[i-1, j]])
+        index = np.argmin(
+            [distMatrix[i-1, j-1], distMatrix[i, j-1], distMatrix[i-1, j]])
         
         if index == 0:
-            if dist_matrix[i, j] > dist_matrix[i-1, j-1]:
-                ops.insert(0, ('replace', s2[i - 1], s1[j - 1])) # replace
+            if distMatrix[i, j] > distMatrix[i-1, j-1]:
+                ops.insert(0, (s2[i - 1], s1[j - 1])) # replace
             else:
-                ops.insert(0, ('identity', s1[i-1], s2[j - 1])) # identity
+                ops.insert(0, (s1[i-1], s2[j - 1])) # identity
             i -= 1
             j -= 1
             
         elif index == 1:
-            ops.insert(0, ('insert', "", s2[j - 1])) # insert
+            ops.insert(0, ("", s2[j - 1])) # insert
             j -= 1
         elif index == 2:
-            ops.insert(0, ('delete', s1[i - 1], "")) # delete
+            ops.insert(0, (s1[i - 1], "")) # delete
             i -= 1
     return ops
 
     #### Край на Вашия код
     #############################################################################
-    
-if __name__== "__main__" :
-    print(editDistance("иван", "иванн"))
-    print(editOperations("мария", "амрия"))
-    print(editOperations("иван", "иванн"))
-    print(editOperations("обича", "убичъ"))
-    print(editOperations("мн", "много"))
 
-def computeOperationProbs(corrected_corpus,uncorrected_corpus,smoothing = 0.2):
+def computeOperationProbs(corrected_corpus, uncorrected_corpus, smoothing = 0.2):
     #### Функцията computeOperationProbs изчислява теглата на дадени елементарни операции (редакции)
     #### Теглото зависи от конкретните символи. Използвайки корпусите, извлечете статистика. Използвайте принципа за максимално правдоподобие. Използвайте изглаждане. 
     #### Вход: Корпус без грешки, Корпус с грешки, параметър за изглаждане. С цел простота може да се счете, че j-тата дума в i-тото изречение на корпуса с грешки е на разстояние не повече от 2 (по Левенщайн-Дамерау) от  j-тата дума в i-тото изречение на корпуса без грешки.
@@ -132,6 +154,8 @@ def computeOperationProbs(corrected_corpus,uncorrected_corpus,smoothing = 0.2):
     #### Изход: Речник, който по зададена наредена двойка от низове връща теглото за операцията.
     
     #### Първоначално ще трябва да преброите и запишете в речника operations броя на редакциите от всеки вид нужни, за да се поправи корпуса с грешки. След това изчислете съответните вероятности.
+    
+    #probability of (op) = (0.2 + number of op in corpus) / (0.2 * len(operations) + sum(op in operations in corpus))
     
     operations = {} # Брой срещания за всяка елементарна операция + изглаждане
     operationsProb = {} # Емпирична вероятност за всяка елементарна операция
@@ -144,10 +168,24 @@ def computeOperationProbs(corrected_corpus,uncorrected_corpus,smoothing = 0.2):
                 continue
             operations[(c+s,s+c)] = smoothing    # transposition
 
+    
     #############################################################################
     #### Начало на Вашия код.
+    
+    print(len(uncorrected_corpus))
+    print(len(corrected_corpus))
+          
+    for index in range(13530):
+        print(uncorrected_corpus[index-1], corrected_corpus[index-1])
+        result = editOperations(uncorrected_corpus[index-1], corrected_corpus[index-1])
+        #print(uncorrected_corpus[index-1])
+        for op in result:
+            if op in operations:
+                operations[op] += 1
+        
+    #print(operations)       
 
-    pass
+    
 
     #### Край на Вашия код.
     #############################################################################
@@ -189,11 +227,17 @@ def generateEdits(q):
     #############################################################################
     #### Начало на Вашия код. На мястото на pass се очакват 10-15 реда
 
-    pass
+    # All edits that are one edit away from `word`.
+
+    splits     = [(q[:i], q[i:])    for i in range(len(q) + 1)]
+    deletes    = [L + R[1:]               for L, R in splits if R]
+    transposes = [L + R[1] + R[0] + R[2:] for L, R in splits if len(R)>1]
+    replaces   = [L + c + R[1:]           for L, R in splits if R for c in alphabet]
+    inserts    = [L + c + R               for L, R in splits for c in alphabet]
+    return set(deletes + transposes + replaces + inserts)
 
     #### Край на Вашия код
     #############################################################################
-
 
 def generateCandidates(query,dictionary,operationProbs):
     ### Започва от заявката query и генерира всички низове НА РАЗСТОЯНИЕ <= 2, за да се получат кандидатите за корекция. Връщат се единствено кандидати, които са в речника dictionary.
@@ -208,9 +252,41 @@ def generateCandidates(query,dictionary,operationProbs):
     
     #############################################################################
     #### Начало на Вашия код. На мястото на pass се очакват 10-15 реда
-
-    pass
-
+    
+    words = set (e2 for e1 in generateEdits(query) for e2 in generateEdits(e1))
+    #operationProbs = computeOperationProbs(corrected_corpus, uncorrected_corpus) - np.log(a,b,operationProbs)
+    #print(words)
+    resultWords = []
+    for w in words:
+        if w in dictionary:
+            resultWords.append(w)
+            
+    return resultWords
+    
+if __name__== "__main__" :
+    #clean_orig = clean_text(corpus_original)
+    #clean_typos = clean_text(corpus_typos)
+    #print(editDistance("иван", "иванн"))
+    #print(editOperations("мария", "амрия"))
+    #print(editOperations("иван", "иванн"))
+    #print(editOperations("обича", "убичъ"))
+    #print(editOperations("мн", "много"))
+    #print(generateCandidates("дам", clean_text(corpus), {}))
+    #computeOperationProbs(clean_text(corpus_original), clean_text(corpus_typos))
+    #print(clean_orig[13530] + " " + clean_typos[13530])
+    #print(clean_orig[13531] + " " + clean_typos[13531])
+    #print(clean_orig[13532] + " " + clean_typos[13532])
+    #print(clean_orig[13533] + " " + clean_typos[13533])
+    #print(clean_orig[13534] + " " + clean_typos[13534])
+    #print(clean_orig[13535] + " " + clean_typos[13535])
+    print(editOperations("печици", "печиъи"))
+    print(editOperations("им", "ми"))   
+    print(editOperations("викат", "викат"))
+    print(editOperations("печатница", "печатница"))
+    print(editOperations("димитър", "димитър"))
+    print(editOperations("благоев", "благоев"))
+    
+    
     #### Край на Вашия код
     #############################################################################
 
