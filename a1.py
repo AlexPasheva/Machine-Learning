@@ -15,39 +15,9 @@
 ########################################
 import numpy as np
 import random
-import nltk
-#nltk.download('punkt')
-#nltk.download('stopwords')
-#nltk.download('wordnet')
-
-corpus_typos = open('corpus_typos.txt', encoding="UTF-8").read()
-corpus_original = open('corpus_original.txt', encoding="UTF-8").read()
 
 alphabet = ['а', 'б', 'в', 'г', 'д', 'е', 'ж', 'з', 'и', 'й', 'к', 'л', 'м', 'н', 'о', 'п', 'р', 'с', 'т', 'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 'ъ', 'ь', 'ю', 'я']
 
-from nltk.tokenize import sent_tokenize
-from nltk import word_tokenize
-from nltk.corpus import stopwords
-from nltk import WordNetLemmatizer
-def clean_text(text):
-    """
-    This function takes as input a text on which several 
-    NLTK algorithms will be applied in order to preprocess it
-    """
-    tokens = word_tokenize(text)
-    # Remove the punctuations
-    tokens = [word for word in tokens if word.isalpha()]
-    # Lower the tokens
-    tokens = [word.lower() for word in tokens]
-    # Remove stopword
-    tokens = [word for word in tokens if not word in stopwords.words("english")]
-    # Lemmatize
-    lemma = WordNetLemmatizer()
-    tokens = [lemma.lemmatize(word, pos = "v") for word in tokens]
-    tokens = [lemma.lemmatize(word, pos = "n") for word in tokens]
-    return tokens
-
-# neshto si se obyrkal
 def extractDictionary(corpus):
     dictionary = set()
     for doc in corpus:
@@ -182,9 +152,6 @@ def computeOperationProbs(corrected_corpus, uncorrected_corpus, smoothing = 0.2)
     #############################################################################
     #### Начало на Вашия код.
     
-    print(len(uncorrected_corpus))
-    print(len(corrected_corpus))
-    
     corrected_corpus_words = flatten(corrected_corpus)
     uncorrected_corpus_words = flatten(uncorrected_corpus)
           
@@ -228,34 +195,32 @@ def editWeight(s1, s2, operationProbs):
     #############################################################################
     #### Начало на Вашия код. На мястото на pass се очакват 10-25 реда
 
-    n1 = len(s1)
-    n2 = len(s2)
-    d = np.zeros((n1 + 1, n2 + 1))
-    for i in range(n1 + 1):
-        d[i, 0] = d[i-1, 0] + operationWeight('', s1[i-1], operationProbs)
-        print("eps + " + s1[i-1] + " " + str(operationWeight('', s1[i-1], operationProbs)))
-        #print('eps -> ' + s1[i-1])
-    for j in range(n2 + 1):
-        d[0, j] = d[i-1, 0] + operationWeight(s2[j-1], '', operationProbs)
-        #print(s2[j-1] + '-> eps')
-        #print(s2[j-1], operationWeight(s2[j-1], '', operationProbs))
-    #print(d)
-    for i in range(n1):
-        for j in range(n2):
-            if s1[i] == s2[j]:
-                #cost = operationWeight(s1[i], s2[j], operationProbs)
-                cost = 0.2
-                #print('VLIZA')
-            else:
-                cost = operationWeight(s1[i], s2[j], operationProbs)
-            d[i+1, j+1] = min(d[i, j+1] + operationWeight(s1[i], s2[j], operationProbs), # insert 
-                              d[i+1, j] + operationWeight(s1[i], s2[j], operationProbs), # delete
-                              d[i, j] + cost ) # replace  # operationWeight(s1[i], s2[j], operationProbs)) # replace
-            if i > 0 and j > 0 and s1[i] == s2[j-1] and s1[i-1] == s2[j]:
-                d[i+1, j+1] = min(d[i+1, j+1], d[i-1, j-1] + operationWeight(s1[i-1:i+1], s2[j-1:j+1], operationProbs)) # transpose
+    cols  = len(s1) + 1
+    rows = len(s2) + 1
+
+    dL = np.zeros((rows , cols))
+
+    for i in range(1,cols):
+        dL[0][i] = dL[0][i - 1] + operationWeight('', s1[i-1], operationProbs)
+
+    for i in range(1,rows):
+        dL[i][0] = dL[i - 1][0] + operationWeight(s2[i - 1], '', operationProbs)
     
-    #print(d)
-    return d[n1, n2]
+    for i in range(1, rows):
+        for j in range(1, cols):
+
+            
+            sub_op = dL[i-1][j-1] + operationWeight(s1[j - 1], s2[i - 1] , operationProbs)
+            ins_op = dL[i-1][j] + operationWeight(s2[i - 1], '', operationProbs)
+            del_op = dL[i][j-1] + operationWeight('', s1[j - 1], operationProbs)
+
+            dL[i][j] = min(sub_op, ins_op, del_op)
+
+            if i > 1 and j > 1 and s1[j - 2] == s2[i - 1] and s1[j - 1] == s2[i - 2]:
+                swap_op = dL[i - 2][j - 2] + operationWeight(s1[j-2:j], s2[i-2:i], operationProbs)
+                dL[i][j] = min(dL[i][j], swap_op)
+    
+    return dL[rows - 1][cols - 1]
 
     #### Край на Вашия код. 
     #############################################################################
@@ -275,14 +240,14 @@ def generateEdits(q):
     splits     = [(q[:i], q[i:])    for i in range(len(q) + 1)]
     deletes    = [L + R[1:]               for L, R in splits if R]
     transposes = [L + R[1] + R[0] + R[2:] for L, R in splits if len(R)>1]
-    replaces   = [L + c + R[1:]           for L, R in splits if R for c in alphabet]
+    replaces   = [L + c + R[1:]  for L, R in splits if R for c in alphabet if c != R[0]]
     inserts    = [L + c + R               for L, R in splits for c in alphabet]
     return set(deletes + transposes + replaces + inserts)
 
     #### Край на Вашия код
     #############################################################################
 
-def generateCandidates(query,dictionary,operationProbs):
+def generateCandidates(query, dictionary, operationProbs):
     ### Започва от заявката query и генерира всички низове НА РАЗСТОЯНИЕ <= 2, за да се получат кандидатите за корекция. Връщат се единствено кандидати, които са в речника dictionary.
         
     ### Вход:
@@ -297,12 +262,11 @@ def generateCandidates(query,dictionary,operationProbs):
     #### Начало на Вашия код. На мястото на pass се очакват 10-15 реда
     
     words = set (e2 for e1 in generateEdits(query) for e2 in generateEdits(e1))
-    #operationProbs = computeOperationProbs(corrected_corpus, uncorrected_corpus) - np.log(a,b,operationProbs)
-    #print(words)
+    
     resultWords = []
     for w in words:
         if w in dictionary:
-            resultWords.append(w)
+            resultWords.append((w, editWeight(query, w, operationProbs)))
             
     return resultWords 
     
@@ -345,8 +309,17 @@ def correctSpelling(r, dictionary, operationProbs):
     #############################################################################
     #### Начало на Вашия код. На мястото на pass се очакват 5-15 реда
 
-    
-    pass
+    corrected_query = []
 
+    for sentence in r:
+        for i, w in enumerate(sentence):
+            if str(w).isalpha():
+                candidates = dict(generateCandidates(str(w), dictionary, operationProbs))
+                corrected_word = min(candidates, key=candidates.get)
+                sentence[i] = corrected_word
+        corrected_query.append(sentence)
+            
+    return corrected_query
     #### Край на Вашия код
     #############################################################################
+    
