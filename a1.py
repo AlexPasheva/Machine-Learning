@@ -20,8 +20,8 @@ import nltk
 #nltk.download('stopwords')
 #nltk.download('wordnet')
 
-corpus_typos = open('corpus_typos.txt').read()
-corpus_original = open('corpus_original.txt').read()
+corpus_typos = open('corpus_typos.txt', encoding="UTF-8").read()
+corpus_original = open('corpus_original.txt', encoding="UTF-8").read()
 
 alphabet = ['а', 'б', 'в', 'г', 'д', 'е', 'ж', 'з', 'и', 'й', 'к', 'л', 'м', 'н', 'о', 'п', 'р', 'с', 'т', 'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 'ъ', 'ь', 'ю', 'я']
 
@@ -93,56 +93,66 @@ def editDistance(s1, s2):
     #############################################################################
  
 def editOperations(s1, s2):
-    #### функцията намира елементарни редакции, неободими за получаването на един низ от друг
-    #### вход: низовете s1 и s2
-    #### изход: списък с елементарните редакции ( идентитет, вмъкване, изтриване, субституция и транспоzиция на символи) необходими, за да се получи втория низ от първия
-    
-    #### Например: editOperations('котка', 'октава') би следвало да връща списъка:
+    # функцията намира елементарни редакции, неободими за получаването на един низ от друг
+    # вход: низовете s1 и s2
+    # изход: списък с елементарните редакции ( идентитет, вмъкване, изтриване, субституция и транспоzиция на символи) необходими, за да се получи втория низ от първия
+
+    # Например: editOperations('котка', 'октава') би следвало да връща списъка:
     ####    [('ко', 'ок'), ('т','т'), ('', 'а'), ('к', 'в'), ('а','а')]
-    ####        |ко   |т |   |к  |а |
-    ####        |ок   |т |а  |в  |а |
-    ####        |Trans|Id|Ins|Sub|Id|
+    # |ко   |т |   |к  |а |
+    # |ок   |т |а  |в  |а |
+    # |Trans|Id|Ins|Sub|Id|
     ####
-    #### Можете да преизползвате и модифицирате кода на функцията editDistance
+    # Можете да преизползвате и модифицирате кода на функцията editDistance
     #############################################################################
-    #### Начало на Вашия код.
-    
+    # Начало на Вашия код.
+
     distMatrix = levenshteinDistanceMatrix(s1, s2)
     i, j = distMatrix.shape
     i -= 1
     j -= 1
-  
+
     ops = list()
-    
+
     while i != 0 and j != 0:
         if i > 1 and j > 1 and s1[i-1] == s2[j-2] and s1[i-2] == s2[j-1]:
             if distMatrix[i-2, j-2] < distMatrix[i, j]:
-                ops.insert(0, (s2[i-1] + s2[i-2], s1[i - 1] + s1[i-2])) # transpose
+                # transpose
+                ops.insert(
+                    0, (s1[i - 2] + s1[i - 1], s1[i - 1] + s1[i - 2]))
                 i -= 2
                 j -= 2
                 continue
-        
+
         index = np.argmin(
             [distMatrix[i-1, j-1], distMatrix[i, j-1], distMatrix[i-1, j]])
-        
+
         if index == 0:
             if distMatrix[i, j] > distMatrix[i-1, j-1]:
-                ops.insert(0, (s2[i - 1], s1[j - 1])) # replace
+                ops.insert(0, (s1[i - 1], s2[j - 1]))  # replace
             else:
-                ops.insert(0, (s1[i-1], s2[j - 1])) # identity
+                ops.insert(0, (s1[i - 1], s2[j - 1]))  # identity
             i -= 1
             j -= 1
-            
+
         elif index == 1:
-            ops.insert(0, ("", s2[j - 1])) # insert
+            ops.insert(0, ("", s2[j - 1]))  # insert
             j -= 1
         elif index == 2:
-            ops.insert(0, (s1[i - 1], "")) # delete
+            ops.insert(0, (s1[i - 1], ""))  # delete
             i -= 1
     return ops
 
-    #### Край на Вашия код
+    # Край на Вашия код
     #############################################################################
+
+
+def flatten(listOfLists):
+    out = []
+    for sublist in listOfLists:
+        out.extend(sublist)
+    return out
+    
 
 def computeOperationProbs(corrected_corpus, uncorrected_corpus, smoothing = 0.2):
     #### Функцията computeOperationProbs изчислява теглата на дадени елементарни операции (редакции)
@@ -168,24 +178,29 @@ def computeOperationProbs(corrected_corpus, uncorrected_corpus, smoothing = 0.2)
                 continue
             operations[(c+s,s+c)] = smoothing    # transposition
 
-    
+
     #############################################################################
     #### Начало на Вашия код.
     
     print(len(uncorrected_corpus))
     print(len(corrected_corpus))
+    
+    corrected_corpus_words = flatten(corrected_corpus)
+    uncorrected_corpus_words = flatten(uncorrected_corpus)
           
-    for index in range(13530):
-        print(uncorrected_corpus[index-1], corrected_corpus[index-1])
-        result = editOperations(uncorrected_corpus[index-1], corrected_corpus[index-1])
-        #print(uncorrected_corpus[index-1])
+    for index in range(len(uncorrected_corpus_words)):
+        result = editOperations(uncorrected_corpus_words[index-1], corrected_corpus_words[index-1])
         for op in result:
             if op in operations:
                 operations[op] += 1
-        
-    #print(operations)       
-
     
+    key_list = list(operations.keys())
+    val_list = list(operations.values())
+    Op = len(operations)
+    for index in range(Op):
+        op = key_list[index]
+        
+        operationsProb[op] = val_list[index] / sum(val_list)
 
     #### Край на Вашия код.
     #############################################################################
@@ -203,6 +218,7 @@ def operationWeight(a,b,operationProbs):
     else:
         print("Wrong parameters ({},{}) of operationWeight call encountered!".format(a,b))
 
+
 def editWeight(s1, s2, operationProbs):
     #### функцията editWeight намира теглото между два низа
     #### За намиране на елеметарните тегла следва да се извиква функцията operationWeight
@@ -212,7 +228,34 @@ def editWeight(s1, s2, operationProbs):
     #############################################################################
     #### Начало на Вашия код. На мястото на pass се очакват 10-25 реда
 
-    pass
+    n1 = len(s1)
+    n2 = len(s2)
+    d = np.zeros((n1 + 1, n2 + 1))
+    for i in range(n1 + 1):
+        d[i, 0] = d[i-1, 0] + operationWeight('', s1[i-1], operationProbs)
+        print("eps + " + s1[i-1] + " " + str(operationWeight('', s1[i-1], operationProbs)))
+        #print('eps -> ' + s1[i-1])
+    for j in range(n2 + 1):
+        d[0, j] = d[i-1, 0] + operationWeight(s2[j-1], '', operationProbs)
+        #print(s2[j-1] + '-> eps')
+        #print(s2[j-1], operationWeight(s2[j-1], '', operationProbs))
+    #print(d)
+    for i in range(n1):
+        for j in range(n2):
+            if s1[i] == s2[j]:
+                #cost = operationWeight(s1[i], s2[j], operationProbs)
+                cost = 0.2
+                #print('VLIZA')
+            else:
+                cost = operationWeight(s1[i], s2[j], operationProbs)
+            d[i+1, j+1] = min(d[i, j+1] + operationWeight(s1[i], s2[j], operationProbs), # insert 
+                              d[i+1, j] + operationWeight(s1[i], s2[j], operationProbs), # delete
+                              d[i, j] + cost ) # replace  # operationWeight(s1[i], s2[j], operationProbs)) # replace
+            if i > 0 and j > 0 and s1[i] == s2[j-1] and s1[i-1] == s2[j]:
+                d[i+1, j+1] = min(d[i+1, j+1], d[i-1, j-1] + operationWeight(s1[i-1:i+1], s2[j-1:j+1], operationProbs)) # transpose
+    
+    #print(d)
+    return d[n1, n2]
 
     #### Край на Вашия код. 
     #############################################################################
@@ -261,9 +304,9 @@ def generateCandidates(query,dictionary,operationProbs):
         if w in dictionary:
             resultWords.append(w)
             
-    return resultWords
+    return resultWords 
     
-if __name__== "__main__" :
+#if __name__== "__main__" :
     #clean_orig = clean_text(corpus_original)
     #clean_typos = clean_text(corpus_typos)
     #print(editDistance("иван", "иванн"))
@@ -272,19 +315,17 @@ if __name__== "__main__" :
     #print(editOperations("обича", "убичъ"))
     #print(editOperations("мн", "много"))
     #print(generateCandidates("дам", clean_text(corpus), {}))
-    #computeOperationProbs(clean_text(corpus_original), clean_text(corpus_typos))
+    #print(computeOperationProbs(clean_text(corpus_original), clean_text(corpus_typos)))
+    #editWeight("мария", "амрия", computeOperationProbs(
+    #    clean_text(corpus_original), clean_text(corpus_typos)))
     #print(clean_orig[13530] + " " + clean_typos[13530])
     #print(clean_orig[13531] + " " + clean_typos[13531])
     #print(clean_orig[13532] + " " + clean_typos[13532])
     #print(clean_orig[13533] + " " + clean_typos[13533])
     #print(clean_orig[13534] + " " + clean_typos[13534])
     #print(clean_orig[13535] + " " + clean_typos[13535])
-    print(editOperations("печици", "печиъи"))
-    print(editOperations("им", "ми"))   
-    print(editOperations("викат", "викат"))
-    print(editOperations("печатница", "печатница"))
-    print(editOperations("димитър", "димитър"))
-    print(editOperations("благоев", "благоев"))
+    #print(editOperations("заявката", "вя"))
+    
     
     
     #### Край на Вашия код
@@ -304,6 +345,7 @@ def correctSpelling(r, dictionary, operationProbs):
     #############################################################################
     #### Начало на Вашия код. На мястото на pass се очакват 5-15 реда
 
+    
     pass
 
     #### Край на Вашия код
