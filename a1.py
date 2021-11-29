@@ -27,24 +27,24 @@ def extractDictionary(corpus):
 
 
 def levenshteinDistanceMatrix(s1, s2):
-    n1 = len(s1)
-    n2 = len(s2)
-    d = np.zeros((n1 + 1, n2 + 1), dtype=int)
-    for i in range(n1 + 1):
+    cols = len(s1)
+    rows = len(s2)
+    d = np.zeros((cols + 1, rows + 1), dtype=int)
+    for i in range(cols + 1):
         d[i, 0] = i
-    for j in range(n2 + 1):
+    for j in range(rows + 1):
         d[0, j] = j
-    for i in range(n1):
-        for j in range(n2):
+    for i in range(cols):
+        for j in range(rows):
             if s1[i] == s2[j]:
                 cost = 0
             else:
                 cost = 1
-            d[i+1, j+1] = min(d[i, j+1] + 1, # insert
-                              d[i+1, j] + 1, # delete
-                              d[i, j] + cost) # replace
+            d[i+1, j+1] = min(d[i, j+1] + 1,                             # insert
+                              d[i+1, j] + 1,                             # delete
+                              d[i, j] + cost)                            # substitute
             if i > 0 and j > 0 and s1[i] == s2[j-1] and s1[i-1] == s2[j]:
-                d[i+1, j+1] = min(d[i+1, j+1], d[i-1, j-1] + cost) # transpose
+                d[i+1, j+1] = min(d[i+1, j+1], d[i-1, j-1] + cost)       # transpose
     return d
     
 def editDistance(s1, s2):
@@ -57,6 +57,7 @@ def editDistance(s1, s2):
     
     resultMatrix = levenshteinDistanceMatrix(s1, s2)
     i,j=resultMatrix.shape
+    
     return resultMatrix[i-1][j-1]
 
     #### Край на Вашия код
@@ -99,17 +100,17 @@ def editOperations(s1, s2):
 
         if index == 0:
             if distMatrix[i, j] > distMatrix[i-1, j-1]:
-                ops.insert(0, (s1[i - 1], s2[j - 1]))  # replace
+                ops.insert(0, (s1[i - 1], s2[j - 1]))     # replace
             else:
-                ops.insert(0, (s1[i - 1], s2[j - 1]))  # identity
+                ops.insert(0, (s1[i - 1], s2[j - 1]))     # substitute
             i -= 1
             j -= 1
 
         elif index == 1:
-            ops.insert(0, ("", s2[j - 1]))  # insert
+            ops.insert(0, ("", s2[j - 1]))                # insert
             j -= 1
         elif index == 2:
-            ops.insert(0, (s1[i - 1], ""))  # delete
+            ops.insert(0, (s1[i - 1], ""))                # delete
             i -= 1
     return ops
 
@@ -135,19 +136,16 @@ def computeOperationProbs(corrected_corpus, uncorrected_corpus, smoothing = 0.2)
     
     #### Първоначално ще трябва да преброите и запишете в речника operations броя на редакциите от всеки вид нужни, за да се поправи корпуса с грешки. След това изчислете съответните вероятности.
     
-    #probability of (op) = (0.2 + number of op in corpus) / (0.2 * len(operations) + sum(op in operations in corpus))
-    
     operations = {} # Брой срещания за всяка елементарна операция + изглаждане
     operationsProb = {} # Емпирична вероятност за всяка елементарна операция
     for c in alphabet:
-        operations[(c,'')] = smoothing    # deletions
-        operations[('',c)] = smoothing    # insertions
+        operations[(c,'')] = smoothing                   # deletions
+        operations[('',c)] = smoothing                   # insertions
         for s in alphabet:
-            operations[(c,s)] = smoothing    # substitution and identity
+            operations[(c,s)] = smoothing                # substitution and identity
             if c == s:    
                 continue
-            operations[(c+s,s+c)] = smoothing    # transposition
-
+            operations[(c+s,s+c)] = smoothing            # transposition
 
     #############################################################################
     #### Начало на Вашия код.
@@ -161,13 +159,12 @@ def computeOperationProbs(corrected_corpus, uncorrected_corpus, smoothing = 0.2)
             if op in operations:
                 operations[op] += 1
     
-    key_list = list(operations.keys())
-    val_list = list(operations.values())
+    keyList = list(operations.keys())
+    valList = list(operations.values())
     Op = len(operations)
     for index in range(Op):
-        op = key_list[index]
-        
-        operationsProb[op] = val_list[index] / sum(val_list)
+        op = keyList[index]
+        operationsProb[op] = valList[index] / sum(valList)
 
     #### Край на Вашия код.
     #############################################################################
@@ -197,30 +194,26 @@ def editWeight(s1, s2, operationProbs):
 
     cols  = len(s1) + 1
     rows = len(s2) + 1
-
-    dL = np.zeros((rows , cols))
+    d = np.zeros((rows , cols))
 
     for i in range(1,cols):
-        dL[0][i] = dL[0][i - 1] + operationWeight('', s1[i-1], operationProbs)
+        d[0][i] = d[0][i - 1] + operationWeight('', s1[i-1], operationProbs)
 
     for i in range(1,rows):
-        dL[i][0] = dL[i - 1][0] + operationWeight(s2[i - 1], '', operationProbs)
+        d[i][0] = d[i - 1][0] + operationWeight(s2[i - 1], '', operationProbs)
     
     for i in range(1, rows):
         for j in range(1, cols):
-
-            
-            sub_op = dL[i-1][j-1] + operationWeight(s1[j - 1], s2[i - 1] , operationProbs)
-            ins_op = dL[i-1][j] + operationWeight(s2[i - 1], '', operationProbs)
-            del_op = dL[i][j-1] + operationWeight('', s1[j - 1], operationProbs)
-
-            dL[i][j] = min(sub_op, ins_op, del_op)
+            d[i][j] = min( d[i-1][j-1] + operationWeight(s2[i-1], s1[j-1] , operationProbs),
+                            d[i-1][j] + operationWeight(s2[i - 1], '', operationProbs),
+                            d[i][j-1] + operationWeight('', s1[j - 1], operationProbs)
+            )
 
             if i > 1 and j > 1 and s1[j - 2] == s2[i - 1] and s1[j - 1] == s2[i - 2]:
-                swap_op = dL[i - 2][j - 2] + operationWeight(s1[j-2:j], s2[i-2:i], operationProbs)
-                dL[i][j] = min(dL[i][j], swap_op)
+                swap_op = d[i - 2][j - 2] + operationWeight(s1[j-2:j], s2[i-2:i], operationProbs)
+                d[i][j] = min(d[i][j], swap_op)
     
-    return dL[rows - 1][cols - 1]
+    return d[rows - 1][cols - 1]
 
     #### Край на Вашия код. 
     #############################################################################
@@ -235,13 +228,11 @@ def generateEdits(q):
     #############################################################################
     #### Начало на Вашия код. На мястото на pass се очакват 10-15 реда
 
-    # All edits that are one edit away from `word`.
-
-    splits     = [(q[:i], q[i:])    for i in range(len(q) + 1)]
-    deletes    = [L + R[1:]               for L, R in splits if R]
-    transposes = [L + R[1] + R[0] + R[2:] for L, R in splits if len(R)>1]
-    replaces   = [L + c + R[1:]  for L, R in splits if R for c in alphabet if c != R[0]]
-    inserts    = [L + c + R               for L, R in splits for c in alphabet]
+    splits     = [(q[:i], q[i:])             for i in range(len(q) + 1)]
+    deletes    = [L + R[1:]                  for L, R in splits if R]
+    transposes = [L + R[1] + R[0] + R[2:]    for L, R in splits if len(R)>1]
+    replaces   = [L + c + R[1:]              for L, R in splits if R for c in alphabet if c != R[0]]
+    inserts    = [L + c + R                  for L, R in splits for c in alphabet]
     return set(deletes + transposes + replaces + inserts)
 
     #### Край на Вашия код
@@ -269,29 +260,7 @@ def generateCandidates(query, dictionary, operationProbs):
             resultWords.append((w, editWeight(query, w, operationProbs)))
             
     return resultWords 
-    
-#if __name__== "__main__" :
-    #clean_orig = clean_text(corpus_original)
-    #clean_typos = clean_text(corpus_typos)
-    #print(editDistance("иван", "иванн"))
-    #print(editOperations("мария", "амрия"))
-    #print(editOperations("иван", "иванн"))
-    #print(editOperations("обича", "убичъ"))
-    #print(editOperations("мн", "много"))
-    #print(generateCandidates("дам", clean_text(corpus), {}))
-    #print(computeOperationProbs(clean_text(corpus_original), clean_text(corpus_typos)))
-    #editWeight("мария", "амрия", computeOperationProbs(
-    #    clean_text(corpus_original), clean_text(corpus_typos)))
-    #print(clean_orig[13530] + " " + clean_typos[13530])
-    #print(clean_orig[13531] + " " + clean_typos[13531])
-    #print(clean_orig[13532] + " " + clean_typos[13532])
-    #print(clean_orig[13533] + " " + clean_typos[13533])
-    #print(clean_orig[13534] + " " + clean_typos[13534])
-    #print(clean_orig[13535] + " " + clean_typos[13535])
-    #print(editOperations("заявката", "вя"))
-    
-    
-    
+
     #### Край на Вашия код
     #############################################################################
 
@@ -309,17 +278,17 @@ def correctSpelling(r, dictionary, operationProbs):
     #############################################################################
     #### Начало на Вашия код. На мястото на pass се очакват 5-15 реда
 
-    corrected_query = []
+    correctedQuery = []
 
     for sentence in r:
         for i, w in enumerate(sentence):
             if str(w).isalpha():
                 candidates = dict(generateCandidates(str(w), dictionary, operationProbs))
-                corrected_word = min(candidates, key=candidates.get)
-                sentence[i] = corrected_word
-        corrected_query.append(sentence)
+                correctedWord = min(candidates, key=candidates.get)
+                sentence[i] = correctedWord
+        correctedQuery.append(sentence)
             
-    return corrected_query
+    return correctedQuery
     #### Край на Вашия код
     #############################################################################
     
