@@ -12,11 +12,11 @@ device = torch.device("cpu")
 batchSize = 32
 char_emb_size = 32
 
-hid_size = 128
+hid_size = 256
 lstm_layers = 2
-dropout = 0.5
+dropout = 0.1
 
-epochs = 3
-learning_rate = 0.001
+epochs = 6
+learning_rate = 0.005
 
 defaultTemperature = 0.4
