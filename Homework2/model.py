@@ -61,8 +61,8 @@ class LSTMLanguageModelPack(torch.nn.Module):
         X = self.preparePaddedBatch(source)
         E = self.embed(X[:-1])
         source_lengths = [len(s)-1 for s in source]
-        outputPacked, _ = self.lstm(torch.nn.utils.rnn.pack_padded_sequence(E, source_lengths, enforce_sorted=False))
-        output,_ = torch.nn.utils.rnn.pad_packed_sequence(outputPacked)
+        output_packed, _ = self.lstm(torch.nn.utils.rnn.pack_padded_sequence(E, source_lengths, enforce_sorted=False))
+        output,_ = torch.nn.utils.rnn.pad_packed_sequence(output_packed)
 
         Z = self.projection(self.dropout(output.flatten(0,1)))
         Y_bar = X[1:].flatten(0,1)

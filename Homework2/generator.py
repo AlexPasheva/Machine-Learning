@@ -26,12 +26,11 @@ def generateCode(model, char2id, startSentence, limit=1000, temperature=1.):
     #############################################################################
     ### Начало на Вашия код.
 
-    # Правим функция, която да предсказва всяка следваща буква
-    # по подобие на фиг. 1, следвайки фиг. 2 от заданието
+    # Функция, която се опитва да предскаже всяка следваща буква
     id2char = dict(enumerate(char2id))
     if len(startSentence) < 2:
-        startSentence += "def "
-        result += "def "
+        startSentence += "def " # kinda hardcoded a word but it doesn't           
+        result += "def "        # produce anything meaningful withou this in the beggining 
 
     def predict(model, source, h=None):
 
@@ -40,12 +39,13 @@ def generateCode(model, char2id, startSentence, limit=1000, temperature=1.):
         source_lengths = [len(s) for s in source]
 
         if h != None:
-            outputPacked, h = model.lstm(torch.nn.utils.rnn.pack_padded_sequence(
+            output_packed, h = model.lstm(torch.nn.utils.rnn.pack_padded_sequence(
                 E, source_lengths, enforce_sorted=False), h)
         else:
-            outputPacked, h = model.lstm(torch.nn.utils.rnn.pack_padded_sequence(
+            output_packed, h = model.lstm(torch.nn.utils.rnn.pack_padded_sequence(
                 E, source_lengths, enforce_sorted=False))
-        output, _ = torch.nn.utils.rnn.pad_packed_sequence(outputPacked)
+            
+        output, _ = torch.nn.utils.rnn.pad_packed_sequence(output_packed)
 
         Z = model.projection(model.dropout(output.flatten(0, 1)))
         length = len(source) - 1
@@ -53,6 +53,7 @@ def generateCode(model, char2id, startSentence, limit=1000, temperature=1.):
         p, topChar = p.topk(32)
         topChar = topChar.numpy().squeeze()
         p = p[length].numpy().squeeze()
+        
         if type(topChar[length]) is np.ndarray:
             t = np.random.choice(topChar[length], p=p / np.sum(p))
         else:
@@ -60,31 +61,30 @@ def generateCode(model, char2id, startSentence, limit=1000, temperature=1.):
         return id2char[t], h
 
     # Проверяваме дали е въведена начална дума
-    # Ако е въведена - добавяме отстояние след нея
-    # Иначе генерираме случайна главна буква, с която да започнем
+    # Ако е въведена - добавяме space
+    # Иначе започваме с "def"
     if(len(startSentence) == 1):
         chars = list(char2id.keys())
-        letters = chars[1:126]  # ord() cast char to int
-        startSentence += np.random.choice(letters)
+        alphabet = chars[1:126] 
+        startSentence += np.random.choice(alphabet)
     else:
         startSentence += " "
 
     initWordSize = len(result)
 
-    python_function = [x for x in result]  # текущото състояние на функцията
-    output, h = predict(model, python_function)
-    #print("output is: ", output)
-    python_function.append(output)
+    gibberish_function = [x for x in result]  # текущото състояние
+    output, h = predict(model, gibberish_function)
+    gibberish_function.append(output)
     model.eval()
 
     size = initWordSize
     while not output == 'щ' and size <= limit:
-        output, h = predict(model, python_function[size], h)
-        python_function.append(output)
+        output, h = predict(model, gibberish_function[size], h)
+        gibberish_function.append(output)
         size = size + 1
 
     result = ""
-    for ch in python_function:
+    for ch in gibberish_function:
         result += ch
 
     #### Край на Вашия код
